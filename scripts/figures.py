@@ -67,6 +67,8 @@ TEAM_COLOURS = {
     "counters_conceded": ("counters_conceded", "Dangerous counters conceded per match (box or shot within 10 s)",
                           "and the counters they allow", "seq_bad"),
     "goal_diff": ("goal_diff", "Goal difference per match", "and their results", "div"),
+    "on_ball_gain": ("on_ball_gain", "Value gained on the ball per possession (SkillCorner EPV, goals)",
+                     "and how much they add on the ball", "seq"),
 }
 
 
@@ -150,7 +152,7 @@ def reliability_chart(rel: pd.DataFrame, path: Path):
     ax.grid(axis="y", visible=False)
     handles = [plt.Rectangle((0, 0), 1, 1, color=BLUE), plt.Rectangle((0, 0), 1, 1, color=ORANGE)]
     ax.legend(handles, ["Style: what he does", "Quality: how well"], loc="lower right", frameon=False, fontsize=8.5)
-    ax.set_title("Style is reliable from 20 matches; quality mostly isn't", loc="left", fontsize=12, pad=10)
+    ax.set_title("Style is reliable from 20 matches; quality needs tiers", loc="left", fontsize=12, pad=10)
     fig.tight_layout()
     fig.savefig(path, dpi=200)
     plt.close(fig)
@@ -202,6 +204,73 @@ def player_card(fp: pd.DataFrame, rel: pd.DataFrame, player: str, path: Path):
     plt.close(fig)
 
 
+def safe_pass_chart(stories: dict, path: Path):
+    """Build-up passes by direction and pressure: how often lost, and how often a loss becomes a chance."""
+    a = pd.DataFrame(stories["A_build_up_passes_by_direction_pressure"]).T
+    a[["dir", "press"]] = a.index.to_series().str.split("|", expand=True).values
+    dirs, press = ["back", "sideways", "forward"], ["not high pressure", "high pressure"]
+    fig, axes = plt.subplots(1, 2, figsize=(10, 3.9))
+    x = np.arange(len(dirs))
+    for ax, col, title in [(axes[0], "loss_rate", "How often the pass is lost"),
+                           (axes[1], "chance_after_loss", "When lost: how often it becomes a chance")]:
+        for i, (pr, c) in enumerate(zip(press, [AQUA, ORANGE])):
+            sub = a[a["press"] == pr].set_index("dir").loc[dirs]
+            v = sub[col].astype(float).values
+            ax.bar(x + (i - 0.5) * 0.36, v, width=0.34, color=c, label=pr.replace("not high", "low / medium"), zorder=3)
+            for xx, vv, n in zip(x + (i - 0.5) * 0.36, v, sub["lost"].astype(int)):
+                ax.text(xx, vv + 0.004, f"{vv:.0%}" + (f"\n({n} lost)" if col == "chance_after_loss" else ""),
+                        ha="center", va="bottom", fontsize=7.5, color=INK2)
+        ax.set_xticks(x, ["Back", "Sideways", "Forward"])
+        ax.yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(1.0, decimals=0))
+        ax.set_ylim(0, 0.3)
+        ax.grid(axis="x", visible=False)
+        ax.set_title(title, loc="left", fontsize=10, color=INK2)
+    axes[0].legend(frameon=False, fontsize=8, loc="upper left")
+    fig.suptitle("The safe pass is rarely lost, but when it is, it hurts", x=0.01, ha="left", fontsize=12.5)
+    fig.text(0.01, 0.01, "Open-play passes in SkillCorner's build-up and create phases. A chance = box entry or shot "
+             "within 10 s of the loss. SkillCorner A-League 2024/25, 20 matches.", fontsize=7, color=MUTED)
+    fig.tight_layout(rect=(0, 0.04, 1, 0.95))
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
+
+
+def buildup_turnover_chart(t: pd.DataFrame, path: Path):
+    """How often a lost ball becomes a dangerous counter: by phase, and inside build-up by zone and how."""
+    BASE = t["dangerous_10s"].mean()
+    ph = t.groupby("loss_phase_type")["dangerous_10s"].agg(["mean", "size"])
+    ph = ph.loc[[c for c in ["build_up", "create", "chaotic", "direct", "finish"] if c in ph.index]]
+    names = {"build_up": "Build-up", "create": "Create", "chaotic": "Chaotic", "direct": "Direct", "finish": "Finish"}
+    b = t[t["loss_phase_type"].isin(["build_up", "create"])]
+    b = b[b["loss_third"] != "attacking_third"]
+    z = b.groupby(["loss_third", "lost_by"])["dangerous_10s"].agg(["mean", "size"]).reset_index()
+    z["label"] = (z["loss_third"].map({"defensive_third": "Own third", "middle_third": "Middle third"}) + " · "
+                  + z["lost_by"].map({"dispossessed": "dispossessed", "failed_pass": "pass cut out",
+                                      "lost_at_reception": "lost on the first touch"}))
+    z = z.sort_values("mean")
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4.2), gridspec_kw={"width_ratios": [1, 1.35]})
+    for ax, labels, vals, ns, color in [
+            (axes[0], [names[i] for i in ph.index][::-1], ph["mean"][::-1], ph["size"][::-1], BLUE),
+            (axes[1], z["label"], z["mean"], z["size"], ORANGE)]:
+        y = np.arange(len(vals))
+        ax.barh(y, vals, color=color, height=0.6, zorder=3)
+        ax.set_yticks(y, labels, fontsize=8.5)
+        for yy, v, n in zip(y, vals, ns):
+            ax.text(v + 0.004, yy, f"{v:.0%}  (n={n})", va="center", fontsize=8, color=INK2)
+        ax.axvline(BASE, color=MUTED, lw=0.8, ls="--", zorder=2)
+        ax.set_xlim(0, 0.24)
+        ax.xaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(1.0, decimals=0))
+        ax.grid(axis="y", visible=False)
+    axes[0].text(BASE + 0.003, -0.55, f"all turnovers {BASE:.1%}", fontsize=7.5, color=MUTED, va="center")
+    axes[0].set_title("Losing the ball, by phase of play", loc="left", fontsize=10, color=INK2)
+    axes[1].set_title("Inside build-up: where and how it was lost", loc="left", fontsize=10, color=INK2)
+    fig.suptitle("Turnovers in build-up are the ones that get punished", x=0.01, ha="left", fontsize=12.5)
+    fig.text(0.01, 0.01, "Share of open-play turnovers followed by a box entry or shot within 10 s. "
+             "SkillCorner A-League 2024/25, 20 matches.", fontsize=7, color=MUTED)
+    fig.tight_layout(rect=(0, 0.04, 1, 0.95))
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--results", default="outputs")
@@ -221,6 +290,12 @@ def main():
     reliability_chart(rel, out / "fig2_reliability.png")
     back_pass_chart(res, out / "fig3_back_passes.png")
     big = fp[(fp["n_decisions"] >= 150) & fp["pos_group"].isin(["MF", "CB", "FB"])]
+    if (src / "turnovers.parquet").exists():
+        buildup_turnover_chart(pd.read_parquet(src / "turnovers.parquet"), out / "fig5_buildup_turnovers.png")
+    if "on_ball_gain" in ts:
+        team_style_map(ts, out / "fig1d_team_style_on_ball_gain.png", colour="on_ball_gain")
+    if (src / "stories.json").exists():
+        safe_pass_chart(json.load(open(src / "stories.json")), out / "fig6_safe_pass.png")
     player = args.player or big.sort_values("provider", ascending=False).index[0]
     player_card(fp, rel, player, out / "fig4_player_card.png")
 

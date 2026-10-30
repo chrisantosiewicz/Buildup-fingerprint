@@ -36,14 +36,15 @@ def main():
     n = args.n
     clips = []
 
-    # 1. Creators: the biggest improvements in a player's own options before releasing the ball.
-    c = poss[poss["on_ball_value_created"].notna()].nlargest(n, "on_ball_value_created")
+    # 1. Creators: the possessions with the highest creator score (EPV gained on the ball plus
+    # passing options ahead gained, against possessions of the same length, position and third).
+    c = poss[poss["creator"].notna()].nlargest(n, "creator")
     clips.append(pd.DataFrame({
         "kind": "creator", "match_id": c["match_id"], "period": c["period"], "clock": clock(c),
         "team": c["team_shortname"], "player": c["player"],
-        "what": [f"{'carried' if k == 1 else 'held'} the ball: best option {a * 1000:.1f} -> {b * 1000:.1f} mG"
-                 for k, a, b in zip(c["carry"], c["best_ev_start"], c["best_ev_pass"])],
-        "value_mG": (c["on_ball_value_created"] * 1000).round(2)}))
+        "what": [f"{'carried' if k == 1 else 'held'} the ball: EPV +{e * 1000:.1f} mG, options ahead {a:+.0f}"
+                 for k, e, a in zip(c["carry"], c["epv_gain"], c["opt_ahead_gain"])],
+        "value_mG": (c["epv_gain"] * 1000).round(2)}))
 
     # 2. Missed options: the largest gaps between the pass played and the best option.
     m = dec.nsmallest(n, "decision_gap")
