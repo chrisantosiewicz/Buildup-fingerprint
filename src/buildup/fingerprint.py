@@ -37,14 +37,14 @@ class Metric:
 METRICS = [
     Metric("long_share", "Long passes (>30 m)", "style", "dec", "long"),
     Metric("forwardness", "Forwardness (vs average option)", "style", "dec", "forward"),
-    Metric("risk", "Risk accepted (vs average option)", "style", "dec", "risk"),
+    Metric("risk", "Risk accepted (vs average option)", "style", "dec", "risk", "has_choice"),
     Metric("back_under_pressure", "Back passes under high pressure", "style", "dec", "back", "high_pressure", 8),
     Metric("carry_share", "Carries", "style", "poss", "carry"),
     Metric("quick_release", "Quick release (<=1 s)", "style", "poss", "quick"),
     Metric("tempo", "Time on the ball (s)", "style", "poss", "duration"),
     Metric("provider", "Provider", "quality", "dec", "provided"),
     Metric("decision_quality", "Decision quality", "quality", "dec", "dq_adj"),
-    Metric("creator", "Creator", "quality", "poss", "created", tiered=False),
+    Metric("creator", "Creator", "quality", "poss", "creator"),
 ]
 
 
@@ -66,6 +66,9 @@ def decision_frame(o: pd.DataFrame, d: pd.DataFrame) -> pd.DataFrame:
     d["back"] = (d["pass_dx"] < -2).astype(float)
     d["long"] = (d["pass_len"] > 30).astype(float)
     d["high_pressure"] = d["passer_pressure_id"] >= 4
+    # A decision with one option says nothing about risk appetite (risk is 0 by construction);
+    # leaving those out lifts player reliability from 0.23 to 0.33.
+    d["has_choice"] = d["n_options"] >= 2
     d["provided"] = d["V_progression"]
     # Decision quality relative to what's typical for the same position, phase and option count.
     typical = d.groupby(["pos_group", "phase", "n_options"])["decision_quality"].transform("mean")
@@ -84,6 +87,22 @@ def possession_frame(events: pd.DataFrame, ovc: pd.DataFrame) -> pd.DataFrame:
     p["carry"] = (p["carry"] == True).astype(float)  # noqa: E712
     p["quick"] = (p["duration"] <= 1.0).astype(float)
     p["created"] = (p["on_ball_value_created"] >= CREATED_THRESHOLD).astype(float)
+    # Creator: what the player adds while he has the ball, from two SkillCorner fields that
+    # are each measured at the start and end of the possession:
+    #   epv_gain       = possession EPV gained on the ball (possession_epv_delta_for)
+    #   opt_ahead_gain = passing options ahead at the end minus at the start
+    # Each is compared with possessions of the same length, position and pitch third, so
+    # holding the ball longer or playing higher up doesn't count as creating. Possessions
+    # ending in a shot are left out (the shot dominates the EPV change).
+    ok = p["end_type"] != "shot"
+    p["epv_gain"] = p["possession_epv_delta_for"].where(ok)
+    p["opt_ahead_gain"] = p["n_passing_options_ahead_at_end"] - p["n_passing_options_ahead_at_start"]
+    p["duration_band"] = pd.cut(p["duration"], [-1, 0.5, 1, 2, 3, 5, np.inf], labels=False)
+    z = []
+    for c in ["epv_gain", "opt_ahead_gain"]:
+        adj = p[c] - p[ok].groupby(["duration_band", "pos_group", "third_start"], observed=True)[c].transform("mean")
+        z.append(adj / adj.std())
+    p["creator"] = (z[0] + z[1]).where(ok)
     return p
 
 
@@ -232,7 +251,7 @@ def team_style(dec: pd.DataFrame, poss: pd.DataFrame) -> pd.DataFrame:
     t["back_under_pressure"] = hp.groupby("team_shortname")["back"].mean()
     t["back_share"] = dec.groupby("team_shortname")["back"].mean()
     pt = poss.groupby("team_shortname").agg(tempo=("duration", "mean"), carry_share=("carry", "mean"),
-                                            creator=("created", "mean"))
+                                            creator=("creator", "mean"), on_ball_gain=("epv_gain", "mean"))
     t = t.join(pt)
     t["directness"] = (_z(t["long_share"]) + _z(t["forwardness"])) / 2
     t["risk_axis"] = (_z(t["risk"]) - _z(t["back_share"])) / 2

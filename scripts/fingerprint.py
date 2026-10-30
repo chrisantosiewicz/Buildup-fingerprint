@@ -42,6 +42,7 @@ def main():
     ts = team_style(dec, poss)
     turnovers = prepare_turnovers(add_outcomes(build_turnovers(events), events))
     ts = ts.join(team_outcomes(args.data, events, turnovers))
+    turnovers.to_parquet(out / "turnovers.parquet")
     rel.to_csv(out / "metric_reliability.csv", index=False)
     fp.round(5).to_csv(out / "player_fingerprint.csv")
     ts.round(5).to_csv(out / "team_style.csv")
