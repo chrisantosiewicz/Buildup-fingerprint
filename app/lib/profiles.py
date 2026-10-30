@@ -32,7 +32,7 @@ GROUPS = {
 }
 EXPLAIN = {
     "provider": "How good a situation each pass hands the receiver (their next options), in goals.",
-    "creator": "How often the player improves their own options on the ball (carry or hold) before passing.",
+    "creator": "Value added on the ball: EPV gained plus passing options ahead gained, against similar possessions.",
     "decision_quality": "Where the chosen pass sits between the worst and best option available.",
     "execution": "Passes completed minus the completion the model expected, given the space around each option.",
     "forwardness": "How far forward the chosen pass goes compared with the average option available.",

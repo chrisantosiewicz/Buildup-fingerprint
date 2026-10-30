@@ -77,9 +77,10 @@ def test_clips_link_to_decisions(results):
 
 @pytest.mark.skipif(not os.environ.get("BUILDUP_RESULTS"), reason="set BUILDUP_RESULTS to the real results folder")
 def test_real_results_keep_the_agreed_claims():
-    """Provider ranks, decision quality is tiers, creator is team-level. A model change that moves these should be a decision."""
+    """Provider ranks; decision quality, creator and risk are tiers. A model change that moves these should be a decision."""
     c = claims.claims(data.load_results(os.environ["BUILDUP_RESULTS"])["reliability"])
-    assert (c["provider"].level, c["decision_quality"].level, c["creator"].level) == ("rank", "tier", "low")
+    got = {m: c[m].level for m in ("provider", "decision_quality", "creator", "risk")}
+    assert got == {"provider": "rank", "decision_quality": "tier", "creator": "tier", "risk": "tier"}
 
 
 PAGES = ["overview", "players", "squad", "rankings", "teams", "replay", "situations", "clips", "method"]

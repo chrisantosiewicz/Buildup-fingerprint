@@ -22,7 +22,8 @@ for c in ["provider"]:
     show[c] = show[c] * 1000
 st.dataframe(show.sort_values("provider", ascending=False).round(3), width="stretch", column_config={
     "provider": st.column_config.NumberColumn("provider (mG/pass)", format="%.2f"),
-    "creator": st.column_config.NumberColumn("creator rate", help="Share of possessions where a player improved their "
-                                             "own options before passing. Reported per team: it is not reliable per player."),
+    "creator": st.column_config.NumberColumn("creator", format="%.3f", help="Value added on the ball: EPV gained plus "
+                                             "passing options ahead gained, against possessions of the same length, "
+                                             "position and third."),
     "progress_10s": st.column_config.NumberColumn("progress in 10 s", format="%.2f"),
 })

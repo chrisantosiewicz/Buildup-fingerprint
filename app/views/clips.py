@@ -8,7 +8,7 @@ ui.need("clips")
 s = ui.app()
 st.title("Clips")
 st.caption("Match, period and clock to find each moment in the footage. Creator moments are where the player "
-           "improved their own options on the ball; this is how creator is shown, since it cannot rank individuals.")
+           "improved their own options on the ball.")
 
 clips = data.link_clips(s.res["clips"], s.res["options"] if s.res.has("options") else None)
 kinds = {"creator": "Made their own option", "missed_option": "Missed a better option",

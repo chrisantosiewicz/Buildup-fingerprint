@@ -79,14 +79,15 @@ with right:
         wide = peers.pivot(index="player", columns="metric", values=["estimate", "lo", "hi"])
         wide.columns = [m if k == "estimate" else f"{m}_{k}" for k, m in wide.columns]
         st.plotly_chart(charts.risk_quadrant(wide.dropna(), player), width="stretch")
-        st.caption("Grey: other players in the same position. Whiskers: 80% range. Risk accepted has low reliability "
-                   "per player (" + f"{s.claims['risk'].reliability:.2f}" + "), so most players' ranges cross the middle; "
-                   "the team style map is where risk reads clearly.")
+        rk_claim = s.claims["risk"]
+        st.caption("Grey: other players in the same position. Whiskers: 80% range. "
+                   f"Risk accepted has reliability {rk_claim.reliability:.2f} per player ({rk_claim.text.lower()}), so "
+                   "many ranges cross the middle; the team style map is where risk reads most clearly.")
 
     st.markdown("**Team context**")
     st.caption("Part of what looks like player quality is the team around them, so the team's number sits next to the player's.")
     ctx = []
-    for m, scale, unit in [("provider", 1000, "mG/pass"), ("decision_quality", 1, ""), ("creator", 100, "%")]:
+    for m, scale, unit in [("provider", 1000, "mG/pass"), ("decision_quality", 1, ""), ("creator", 1, "score")]:
         tv = team_context(s, r["team"], m)
         pv = r.get(m)
         if tv is not None and pd.notna(pv):
@@ -95,7 +96,7 @@ with right:
     if ctx:
         st.dataframe(pd.DataFrame(ctx), hide_index=True, width="stretch")
     if "creator" in s.claims and s.claims["creator"].level == "low":
-        st.caption("Creator is not reliable per player over 20 matches. Use the team rate above and the "
+        st.caption("Creator is not reliable per player over 20 matches. Use the team number above and the "
                    "player's creator clips on the Clips page.")
 
 # ---- moments ----
