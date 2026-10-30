@@ -47,9 +47,11 @@ def pct(row) -> str:
 # ---- headline tiles ----
 t1, t2, t3, t4 = st.columns(4)
 prov, dq, ex = est("provider"), est("decision_quality"), est("execution")
-t1.metric("Creation · provider", pct(prov), help=profiles.EXPLAIN["provider"])
-t1.markdown(ui.badge(s.claims.get("provider")) + (f" range {prov['lo']:.0%}–{prov['hi']:.0%}" if prov is not None else ""))
 TIER_TILE = {"above average": "Top tier", "around average": "Middle tier", "below average": "Bottom tier"}
+prov_claim = s.claims.get("provider")
+prov_value = pct(prov) if prov is None or (prov_claim and prov_claim.can_rank) else TIER_TILE.get(prov["tier"], prov["tier"])
+t1.metric("Creation · provider", prov_value, help=profiles.EXPLAIN["provider"])
+t1.markdown(ui.badge(prov_claim) + (f" range {prov['lo']:.0%}–{prov['hi']:.0%}" if prov is not None else ""))
 t2.metric("Decision quality", TIER_TILE.get(dq["tier"], dq["tier"]) if dq is not None else "n/a", help=profiles.EXPLAIN["decision_quality"])
 t2.markdown(ui.badge(s.claims.get("decision_quality"))
             + (f" {dq['p_above']:.0%} chance above average" if dq is not None else ""))
@@ -115,8 +117,10 @@ if s.res.has("options"):
 
 with st.expander("How to read this"):
     st.markdown(
-        "- **Creation (provider):** the one quality ranking the data supports (reliability "
-        f"{s.claims['provider'].reliability:.2f}, checked against SkillCorner season data).\n"
+        "- **Creation (provider):** the most reliable quality measure (reliability "
+        f"{s.claims['provider'].reliability:.2f}, checked against SkillCorner season data), shown as tiers because "
+        "player ranges are wide.\n"
+        "- **Creation (creator):** value added on the ball. Its tiers are indicative only.\n"
         "- **Decision quality:** shown as a tier with the chance the player is above the position average. "
         "Exact ranks would over-claim at this reliability.\n"
         "- **Execution:** completion above what the model expected. Its reliability is measured here on odd vs even "

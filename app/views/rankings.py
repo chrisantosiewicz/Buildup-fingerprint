@@ -18,6 +18,10 @@ rankable = [m for m, c in s.claims.items() if c.can_rank and c.kind == "quality"
 tiered = [m for m, c in s.claims.items() if c.level == "tier" and c.kind == "quality"]
 low = [c.label for c in s.claims.values() if c.level == "low" and c.kind == "quality"]
 
+if not rankable:
+    st.caption("No quality measure is precise enough for an exact player ranking over 20 matches, so every one is "
+               "shown as tiers. Style dials, which are more reliable, are on each player's profile.")
+
 for m in rankable:
     c = s.claims[m]
     st.subheader(f"{c.label} {ui.badge(c)}")
@@ -35,6 +39,8 @@ for m in tiered:
     st.subheader(f"{c.label} {ui.badge(c)}")
     st.caption(f"Reliability {c.reliability:.2f}: {c.text.lower()}. Players are grouped, not ordered: "
                "'above' means at least an 80% chance of being above the position average. Names are alphabetical.")
+    if c.note:
+        st.caption(c.note)
     t = pool[pool["metric"] == m]
     cols = st.columns(3)
     for col, tier in zip(cols, ["above average", "around average", "below average"]):

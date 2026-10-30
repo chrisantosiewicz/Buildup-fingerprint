@@ -41,7 +41,9 @@ def need(*keys: str) -> None:
 
 
 def badge(c: Claim | None) -> str:
-    return BADGE[c.level] if c else ""
+    if not c:
+        return ""
+    return BADGE[c.level] + (" :orange-badge[Indicative]" if c.note.startswith("Indicative") else "")
 
 
 def mg(x: float, signed: bool = False) -> str:

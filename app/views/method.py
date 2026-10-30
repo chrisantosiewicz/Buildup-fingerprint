@@ -16,7 +16,7 @@ st.markdown(
     "confidence label and makes the claim at team level and with clips.")
 st.plotly_chart(charts.reliability_chart(s.claims), width="stretch")
 st.dataframe(pd.DataFrame([{"metric": c.label, "kind": c.kind, "reliability": c.reliability, "team r": c.team_r,
-                            "what the app claims": c.text} for c in s.claims.values()]),
+                            "what the app claims": c.text, "note": c.note} for c in s.claims.values()]),
              hide_index=True, width="stretch")
 st.caption("Execution is measured inside the app from the option table, with the same odd/even check.")
 

@@ -48,6 +48,13 @@ def test_claim_levels_follow_thresholds():
     assert [claims.level(x) for x in (0.55, 0.5, 0.32, 0.29, np.nan)] == ["rank", "rank", "tier", "low", "low"]
 
 
+def test_overrides_only_lower_levels():
+    rel = pd.DataFrame({"metric": ["provider", "creator"], "label": ["Provider", "Creator"], "kind": "quality",
+                        "player_reliability": [0.9, 0.1]})
+    c = claims.claims(rel)
+    assert c["provider"].level == "tier" and c["creator"].level == "low" and c["creator"].note
+
+
 def test_estimates_respect_reliability_and_sample_size():
     sure = profiles.estimate(0.9, 0.95, 100, 100)
     noisy = profiles.estimate(0.9, 0.2, 100, 100)
@@ -77,10 +84,11 @@ def test_clips_link_to_decisions(results):
 
 @pytest.mark.skipif(not os.environ.get("BUILDUP_RESULTS"), reason="set BUILDUP_RESULTS to the real results folder")
 def test_real_results_keep_the_agreed_claims():
-    """Provider ranks; decision quality, creator and risk are tiers. A model change that moves these should be a decision."""
+    """Provider, decision quality, creator and risk are all tiers. A model change that moves these should be a decision."""
     c = claims.claims(data.load_results(os.environ["BUILDUP_RESULTS"])["reliability"])
     got = {m: c[m].level for m in ("provider", "decision_quality", "creator", "risk")}
-    assert got == {"provider": "rank", "decision_quality": "tier", "creator": "tier", "risk": "tier"}
+    assert got == {"provider": "tier", "decision_quality": "tier", "creator": "tier", "risk": "tier"}
+    assert c["creator"].note and c["provider"].note
 
 
 PAGES = ["overview", "players", "squad", "rankings", "teams", "replay", "situations", "clips", "method"]

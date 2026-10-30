@@ -27,7 +27,10 @@ rows = []
 for p, r in fp[fp["team"] == team].sort_values(["pos_group", "n_decisions"], ascending=[True, False]).iterrows():
     out = {"player": p, "position": r["pos_group"], "decisions": int(r["n_decisions"])}
     get = {m: cell(m) for m in ["provider", "decision_quality", "execution", "forwardness", "risk"]}
-    for m, col in [("provider", "Creation (provider)"), ("execution", "Execution")]:
+    if p in get["provider"].index:
+        out["Creation (provider)"] = get["provider"].at[p, "tier"]
+        out["Creation (provider) range"] = f"{get['provider'].at[p, 'lo']:.0%}–{get['provider'].at[p, 'hi']:.0%}"
+    for m, col in [("execution", "Execution")]:
         if p in get[m].index:
             e = get[m].loc[p]
             out[col] = e["estimate"] * 100
@@ -42,7 +45,7 @@ for p, r in fp[fp["team"] == team].sort_values(["pos_group", "n_decisions"], asc
     rows.append(out)
 table = pd.DataFrame(rows)
 cfg = {c: st.column_config.ProgressColumn(c, min_value=0, max_value=100, format="%.0f")
-       for c in ["Creation (provider)", "Execution"] if c in table}
+       for c in ["Execution"] if c in table}
 ev = st.dataframe(table, hide_index=True, width="stretch", column_config=cfg, on_select="rerun",
                   selection_mode="single-row")
 if ev.selection.rows:

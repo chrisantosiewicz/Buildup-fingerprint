@@ -8,6 +8,9 @@ Reliability is the within-position split-half correlation projected to all 20 ma
     < 0.3       low          shown per player only with a wide range and a "low confidence" label;
                              the claim is made at team level and with clips
 
+OVERRIDES can only lower a level (never raise it) and attach a note, for claims the evidence checks
+softened beyond what reliability alone says (RANKING_SYSTEM.md §9).
+
 Because the level is read from the data, a metric that gets more (or less) reliable when the models
 change moves level by itself. tests/test_app.py pins today's levels so such a move is noticed.
 """
@@ -34,6 +37,7 @@ class Claim:
     reliability: float
     level: str
     team_r: float | None = None
+    note: str = ""
 
     @property
     def can_rank(self) -> bool:
@@ -44,6 +48,22 @@ class Claim:
         return LEVEL_TEXT[self.level]
 
 
+ORDER = ["low", "tier", "rank"]
+OVERRIDES = {  # metric: (highest level allowed, note shown with the metric)
+    "provider": ("tier", "The most reliable quality measure, but player intervals are wide "
+                         "(median 80% range about 6th to 89th percentile), so it is shown as tiers, not an exact ranking."),
+    "creator": ("tier", "Indicative only: the odd-to-even match check is weak (r 0.27, 95% CI −0.01 to 0.51, 50 players)."),
+}
+
+
+def _apply(c: Claim) -> Claim:
+    if c.metric not in OVERRIDES:
+        return c
+    cap, note = OVERRIDES[c.metric]
+    lvl = min(c.level, cap, key=ORDER.index)
+    return Claim(c.metric, c.label, c.kind, c.reliability, lvl, c.team_r, note)
+
+
 def level(reliability: float) -> str:
     if pd.isna(reliability):
         return "low"
@@ -51,8 +71,8 @@ def level(reliability: float) -> str:
 
 
 def claims(rel: pd.DataFrame) -> dict[str, Claim]:
-    return {r.metric: Claim(r.metric, r.label, r.kind, float(r.player_reliability), level(r.player_reliability),
-                            None if pd.isna(getattr(r, "team_r", None)) else float(r.team_r))
+    return {r.metric: _apply(Claim(r.metric, r.label, r.kind, float(r.player_reliability), level(r.player_reliability),
+                                   None if pd.isna(getattr(r, "team_r", None)) else float(r.team_r)))
             for r in rel.itertuples()}
 
 
