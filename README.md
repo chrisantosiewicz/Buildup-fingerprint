@@ -15,8 +15,15 @@ pytest
 ```bash
 python scripts/option_value.py     --data ../opendata/data --out outputs    # option value, decisions (~10 min)
 python scripts/fingerprint.py --data ../opendata/data --buildup outputs --out outputs
+python scripts/clips.py       --results outputs --out outputs
 python scripts/figures.py     --results outputs --out figures
 streamlit run app/explorer.py -- --results outputs
+```
+
+To host the app, bundle only what it reads (the option table becomes a slim parquet):
+```bash
+python scripts/export_app_data.py --results outputs --out app_data
+streamlit run app/explorer.py -- --results app_data
 ```
 
 `option_value.py` uses tracking by default for pass completion. Add `--no-tracking` to use SkillCorner's xPass only, which needs the event files alone.
@@ -35,7 +42,7 @@ Earlier studies:
 - `fingerprint.py`: style and quality metrics, reliability, calibrated player estimates and tiers, team style axes.
 - `features.py`: rest-defence features from tracking (null-result study).
 - `scripts/`: runnable pipelines. `scripts/exploratory/`: the one-off analyses behind the decisions (they use scratch paths).
-- `app/explorer.py`: the Build-Up Explorer (Streamlit).
+- `app/`: the Build-Up Explorer (Streamlit). `explorer.py` is the entry point; `lib/data.py` finds and checks the outputs, `lib/claims.py` decides what each metric may claim from its reliability (rank, tiers, or low confidence), `lib/profiles.py` turns percentiles into estimates with 80% ranges, and `views/` has one file per page.
 - `tests/`: unit tests on synthetic data.
 
 No data is committed. Licence: MIT (LICENSE.md).
